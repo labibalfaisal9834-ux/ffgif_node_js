@@ -344,6 +344,29 @@ await prisma.$transaction(async (tx) => {
 
 ---
 
+### 4.3 Database Migrations CLI & Workflow (`prisma migrate`)
+
+**Concept & How it Works:**
+Prisma eliminates manually writing sequential SQL migration files by diffing the declarative `schema.prisma` against the active database state. Running `prisma migrate dev --name <migration_name>` automatically generates a versioned SQL migration file, executes it against the database, updates the `_prisma_migrations` tracking table, and regenerates the TypeScript client (`@prisma/client`) with instant type safety. In production, `prisma migrate deploy` applies unapplied migrations without prompting.
+
+**Illustrative Snippet:**
+```bash
+# Generate and apply a migration during development:
+npx prisma migrate dev --name add_user_preferences
+
+# Apply migrations in CI / production deployment:
+npx prisma migrate deploy
+
+# Direct push without migration files (prototyping):
+npx prisma db push
+```
+
+**Go equivalent / closest analogue:** `golang-migrate` CLI (`migrate -database "postgres://..." -path ./migrations up`) managing numbered SQL files (`000001_init.up.sql`).
+
+**Where this pattern is used in this project:** [prisma/schema.prisma](file:///Users/labib0x9/Desktop/ffgif_node_js/prisma/schema.prisma)
+
+---
+
 ## 5. Security & Cryptography
 
 ### 5.1 Password Hashing with Salt & Pepper (Bcrypt)
@@ -463,6 +486,33 @@ await channel.assertQueue('jobs.retry', {
 **Go equivalent / closest analogue:** Declaring `amqp.Table{"x-dead-letter-exchange": "app.dlx", "x-message-ttl": 5000}` with `ch.QueueDeclare`.
 
 **Where this pattern is used in this project:** [src/infrastructure/rabbitmq/client.ts](file:///Users/labib0x9/Desktop/ffgif_node_js/src/infrastructure/rabbitmq/client.ts)
+
+---
+
+### 6.3 Code-Driven Topology Auto-Provisioning vs. Bootstrap CLI
+
+**Concept & How it Works:**
+In microservices and containerized environments, external infrastructure prerequisites (such as AMQP exchanges, dead-letter bindings, S3 buckets, and notification triggers) should be idempotent and self-healing. By encapsulating topology assertions inside the client connection lifecycle, the application and background workers automatically provision and verify required exchanges, queues, and S3 bucket policies upon startup without requiring manual external setup scripts.
+
+**Illustrative Snippet:**
+```typescript
+async function initializeInfrastructure(channel: amqplib.Channel, s3Client: S3Client) {
+  // Ensure message broker topology exists
+  await channel.assertExchange('events', 'fanout', { durable: true });
+  await channel.assertQueue('events.audit', { durable: true });
+  await channel.bindQueue('events.audit', 'events', '');
+
+  // Ensure storage bucket exists
+  const exists = await s3Client.bucketExists('uploads');
+  if (!exists) {
+    await s3Client.makeBucket('uploads', 'us-east-1');
+  }
+}
+```
+
+**Go equivalent / closest analogue:** Dedicated setup binary / CLI command (`cmd/bootstrap/main.go`) executed manually or in deployment init containers.
+
+**Where this pattern is used in this project:** [src/infrastructure/rabbitmq/setup.ts](file:///Users/labib0x9/Desktop/ffgif_node_js/src/infrastructure/rabbitmq/setup.ts)
 
 ---
 

@@ -184,5 +184,32 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
         });
       }
     });
+
+    // GET /jobs/:jobId/status
+    protectedScope.get('/jobs/:jobId/status', async (request, reply) => {
+      const { jobId } = request.params as { jobId: string };
+      const userId = request.authUser.sub;
+
+      try {
+        const { ConversionStatusService } = await import('../../../application/media/conversion_status.service.js');
+        const conversionStatusService = new ConversionStatusService(cacheRepo);
+        const result = await conversionStatusService.execute(userId, jobId);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        if (err instanceof GifOwnerMismatchError) {
+          return reply.status(403).send({
+            error_code: 'GIF_FORBIDDEN',
+            message: 'Gif Owner mismatch',
+            status: 403,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
   });
 };

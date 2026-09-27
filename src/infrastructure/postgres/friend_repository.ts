@@ -102,7 +102,11 @@ export class PostgresFriendRepository implements FriendRepository {
   }
 
   async listFriends(userId: string): Promise<FriendResponse[]> {
-    const records = await this.prisma.friendship.findMany({
+    type FriendshipWithUsers = Prisma.FriendshipGetPayload<{
+      include: { requester: true; addressee: true };
+    }>;
+
+    const records = (await this.prisma.friendship.findMany({
       where: {
         OR: [{ requesterId: userId }, { addresseeId: userId }],
         status: 'accepted',
@@ -111,9 +115,9 @@ export class PostgresFriendRepository implements FriendRepository {
         requester: true,
         addressee: true,
       },
-    });
+    })) as FriendshipWithUsers[];
 
-    return records.map((f) => {
+    return records.map((f: FriendshipWithUsers) => {
       const friendUser = f.requesterId === userId ? f.addressee : f.requester;
       return {
         user_id: friendUser.id,
@@ -126,7 +130,11 @@ export class PostgresFriendRepository implements FriendRepository {
   }
 
   async listPendingIncoming(userId: string): Promise<FriendResponse[]> {
-    const records = await this.prisma.friendship.findMany({
+    type FriendshipWithRequester = Prisma.FriendshipGetPayload<{
+      include: { requester: true };
+    }>;
+
+    const records = (await this.prisma.friendship.findMany({
       where: {
         addresseeId: userId,
         status: 'pending',
@@ -134,9 +142,9 @@ export class PostgresFriendRepository implements FriendRepository {
       include: {
         requester: true,
       },
-    });
+    })) as FriendshipWithRequester[];
 
-    return records.map((f) => ({
+    return records.map((f: FriendshipWithRequester) => ({
       user_id: f.requester.id,
       username: f.requester.username,
       fullname: f.requester.fullname || '',
@@ -145,3 +153,4 @@ export class PostgresFriendRepository implements FriendRepository {
     }));
   }
 }
+

@@ -18,14 +18,14 @@ export interface VideoMessage {
   width: number;
   fps: number;
   loop: boolean;
-  retries: number;
+  retries?: number;
 }
 
 export interface SaveVideoMessage {
   key: string;
   user_id: string;
   filename: string;
-  retries: number;
+  retries?: number;
 }
 
 export class RabbitMQClient {

@@ -190,6 +190,48 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
   });
 
+  // POST /auth/forgot-password
+  fastify.post('/auth/forgot-password', async (request, reply) => {
+    const parseResult = forgotPasswordSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(422).send({
+        error_code: 'VALIDATION_FAILED',
+        message: 'field required',
+        status: 422,
+      });
+    }
+
+    try {
+      const { ForgotPasswordService } = await import('../../../application/auth/forgot_password.service.js');
+      const { PostgresReseterRepository } = await import('../../../infrastructure/postgres/reseter_repository.js');
+
+      const authRepo = new PostgresAuthRepository(prisma);
+      const reseterRepo = new PostgresReseterRepository(prisma);
+      const forgotPasswordService = new ForgotPasswordService(authRepo, reseterRepo, rabbitmq);
+
+      await forgotPasswordService.execute(parseResult.data.email);
+      return reply.status(202).send({ msg: 'check mail' });
+    } catch (err: any) {
+      if (err instanceof UserNotFoundError) {
+        // Silently succeed to prevent user enumeration
+        return reply.status(202).send({ msg: 'check mail' });
+      }
+      if (err instanceof UserNotVerifiedError) {
+        return reply.status(403).send({
+          error_code: 'AUTH_USER_NOT_VERIFIED',
+          message: 'user is not varified',
+          status: 403,
+        });
+      }
+      request.log.error(err);
+      return reply.status(500).send({
+        error_code: 'INTERNAL_ERROR',
+        message: 'internal server error',
+        status: 500,
+      });
+    }
+  });
+
   // Protected auth routes (wrapped with authGuard plugin)
   fastify.register(async (protectedScope) => {
     protectedScope.register(authGuard);

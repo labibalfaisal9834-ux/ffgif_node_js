@@ -6,7 +6,7 @@ import { getStorageRepository } from '../../../infrastructure/minio/storage_repo
 import { RedisCacheRepository } from '../../../infrastructure/redis/cache.js';
 import { getRedisClientSync } from '../../../infrastructure/redis/client.js';
 import { authGuard } from '../plugins/auth_guard.js';
-import { QuotaExceededError } from '../../../domain/user/errors.js';
+import { QuotaExceededError, PreconditionFailedError } from '../../../domain/user/errors.js';
 import { InvalidFileExtensionError, GifNotFoundError, GifOwnerMismatchError, ThumbnailNotFoundError, LastVideoNotFoundError } from '../../../domain/media/errors.js';
 
 export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -113,6 +113,57 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
             error_code: 'GIF_FORBIDDEN',
             message: 'Gif Owner mismatch',
             status: 403,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
+
+    // PATCH /gifs/me/:key
+    protectedScope.patch('/gifs/me/:key', async (request, reply) => {
+      const { key } = request.params as { key: string };
+      const userId = request.authUser.sub;
+      const parseResult = updateGifSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(422).send({
+          error_code: 'VALIDATION_FAILED',
+          message: 'field required',
+          status: 422,
+        });
+      }
+
+      const ifMatch = request.headers['if-match'];
+
+      try {
+        const { UpdateGifService } = await import('../../../application/media/update_gif.service.js');
+        const updateGifService = new UpdateGifService(prisma);
+        const result = await updateGifService.execute(userId, key, parseResult.data, ifMatch);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        if (err instanceof GifNotFoundError) {
+          return reply.status(404).send({
+            error_code: 'GIF_NOT_FOUND',
+            message: 'gif not found',
+            status: 404,
+          });
+        }
+        if (err instanceof GifOwnerMismatchError) {
+          return reply.status(403).send({
+            error_code: 'GIF_FORBIDDEN',
+            message: 'Gif Owner mismatch',
+            status: 403,
+          });
+        }
+        if (err instanceof PreconditionFailedError) {
+          return reply.status(412).send({
+            error_code: 'PRECONDITION_FAILED',
+            message: 'etag not matched',
+            status: 412,
           });
         }
         request.log.error(err);

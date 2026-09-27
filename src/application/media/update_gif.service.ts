@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { GifResponse } from '../../domain/media/entity.js';
 import { GifNotFoundError, GifOwnerMismatchError } from '../../domain/media/errors.js';
 import { PreconditionFailedError } from '../../domain/user/errors.js';
@@ -14,7 +14,7 @@ export class UpdateGifService {
     data: UpdateGifInput,
     ifMatch?: string
   ): Promise<GifResponse> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const gifRepo = new PostgresGifRepository(tx);
       const ownerId = await gifRepo.getOwner(key);
       if (!ownerId) {

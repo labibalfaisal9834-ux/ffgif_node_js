@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { UserExistsError, UserCreateFailedError } from '../../domain/auth/errors.js';
 import { PasswordHasher } from './password_hasher.js';
 import { generateToken } from './token_util.js';
@@ -30,7 +30,7 @@ export class SignupService {
     const passwordHash = await this.hasher.hash(input.password);
 
     // One Postgres transaction using Prisma's $transaction
-    const txResult = await this.prisma.$transaction(async (tx) => {
+    const txResult = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const authRepo = new PostgresAuthRepository(tx);
       const verifierRepo = new PostgresVerifierRepository(tx);
       const profileRepo = new PostgresProfileRepository(tx);

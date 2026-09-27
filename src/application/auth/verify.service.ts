@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { getTokenHash } from './token_util.js';
 import { PostgresVerifierRepository } from '../../infrastructure/postgres/verifier_repository.js';
 import { PostgresAuthRepository } from '../../infrastructure/postgres/auth_repository.js';
@@ -10,7 +10,7 @@ export class VerifyService {
   async execute(token: string): Promise<void> {
     const tokenHash = getTokenHash(token);
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const verifierRepo = new PostgresVerifierRepository(tx);
       const authRepo = new PostgresAuthRepository(tx);
 

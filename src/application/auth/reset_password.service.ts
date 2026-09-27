@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { getTokenHash } from './token_util.js';
 import { PasswordHasher } from './password_hasher.js';
 import { PostgresReseterRepository } from '../../infrastructure/postgres/reseter_repository.js';
@@ -33,7 +33,7 @@ export class ResetPasswordService {
 
     let userEmail = '';
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const reseterRepo = new PostgresReseterRepository(tx);
       const authRepo = new PostgresAuthRepository(tx);
 

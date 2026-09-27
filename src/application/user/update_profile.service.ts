@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { UserNotFoundError } from '../../domain/auth/errors.js';
 import { PreconditionFailedError } from '../../domain/user/errors.js';
 import { UserProfileDTO } from './get_profile.service.js';
@@ -14,7 +14,7 @@ export class UpdateProfileService {
   ): Promise<UserProfileDTO> {
     const cleanIfMatch = ifMatch.replace(/^"+|"+$/g, '').trim();
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const user = await tx.user.findUnique({
         where: { id: userId },
         include: { profile: true },

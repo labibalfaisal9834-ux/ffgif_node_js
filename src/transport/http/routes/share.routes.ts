@@ -198,4 +198,38 @@ export const shareRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       });
     }
   });
+
+  // GET /s/:token/download
+  fastify.get('/s/:token/download', async (request, reply) => {
+    const { token } = request.params as { token: string };
+    if (!token) {
+      return reply.status(400).send({
+        error_code: 'BAD_REQUEST',
+        message: 'token is missing',
+        status: 400,
+      });
+    }
+
+    try {
+      const { DownloadByTokenService } = await import('../../../application/share/download_by_token.service.js');
+      const { getStorageRepository } = await import('../../../infrastructure/minio/storage_repo.js');
+      const downloadByTokenService = new DownloadByTokenService(prisma, getStorageRepository());
+      const downloadUrl = await downloadByTokenService.execute(token);
+      return reply.status(200).send({ download_url: downloadUrl });
+    } catch (err: any) {
+      if (err instanceof ShareNotFoundError) {
+        return reply.status(404).send({
+          error_code: 'SHARE_NOT_FOUND',
+          message: 'share not found or expired',
+          status: 404,
+        });
+      }
+      request.log.error(err);
+      return reply.status(500).send({
+        error_code: 'INTERNAL_ERROR',
+        message: 'internal server error',
+        status: 500,
+      });
+    }
+  });
 };

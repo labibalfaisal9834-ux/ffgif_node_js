@@ -4,6 +4,7 @@ import fastifyJwt from '@fastify/jwt';
 import { Config, getConfig } from '../../config/env.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { userRoutes } from './routes/user.routes.js';
+import { mediaRoutes } from './routes/media.routes.js';
 
 export function buildServer(configOverride?: Config): FastifyInstance {
   const cnf = configOverride || getConfig();
@@ -48,6 +49,7 @@ export function buildServer(configOverride?: Config): FastifyInstance {
   // Register domain routes
   app.register(authRoutes);
   app.register(userRoutes);
+  app.register(mediaRoutes);
 
   return app;
 }

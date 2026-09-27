@@ -34,7 +34,7 @@ export class PostgresGifRepository implements GifRepository {
         fileSizeBytes: gif.fileSizeBytes ?? BigInt(0),
         width: gif.width ?? 0,
         height: gif.height ?? 0,
-        durationSeconds: new Prisma.Decimal(gif.durationSeconds ?? 0),
+        durationSeconds: gif.durationSeconds ?? 0,
         isPublic: gif.isPublic ?? false,
         url: gif.url || '',
         thumbnailKey: gif.thumbnailKey || '',

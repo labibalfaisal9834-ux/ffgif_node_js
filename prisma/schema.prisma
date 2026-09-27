@@ -27,6 +27,8 @@ model User {
   gifs           Gif[]
   ownedShares    Share[]     @relation("ShareOwner")
   receivedShares Share[]     @relation("ShareRecipient")
+  sentFriendRequests     Friendship[] @relation("SentFriendRequests")
+  receivedFriendRequests Friendship[] @relation("ReceivedFriendRequests")
 
   @@map("users")
 }
@@ -160,3 +162,21 @@ model ShareToken {
   @@index([gifKey], map: "idx_share_tokens_gif_key")
   @@map("share_tokens")
 }
+
+model Friendship {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requesterId String   @map("requester_id") @db.Uuid
+  addresseeId String   @map("addressee_id") @db.Uuid
+  status      String   @default("pending")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  requester User @relation("SentFriendRequests", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("ReceivedFriendRequests", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([requesterId], map: "idx_friendships_requester_id")
+  @@index([addresseeId], map: "idx_friendships_addressee_id")
+  @@map("friendships")
+}
+

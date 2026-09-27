@@ -85,5 +85,32 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
         });
       }
     });
+
+    // GET /uploads/:key/stream
+    protectedScope.get('/uploads/:key/stream', async (request, reply) => {
+      const { key } = request.params as { key: string };
+      const userId = request.authUser.sub;
+
+      try {
+        const { StreamService } = await import('../../../application/media/stream.service.js');
+        const streamService = new StreamService(storageRepo);
+        const result = await streamService.execute(userId, key);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        if (err instanceof GifOwnerMismatchError) {
+          return reply.status(403).send({
+            error_code: 'GIF_FORBIDDEN',
+            message: 'Gif Owner mismatch',
+            status: 403,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
   });
 };

@@ -141,5 +141,48 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
         });
       }
     });
+
+    // POST /jobs
+    protectedScope.post('/jobs', async (request, reply) => {
+      const parseResult = convertMediaSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(422).send({
+          error_code: 'VALIDATION_FAILED',
+          message: 'field required',
+          status: 422,
+        });
+      }
+
+      const userId = request.authUser.sub;
+      try {
+        const { ConvertService } = await import('../../../application/media/convert.service.js');
+        const { getRabbitMQClient } = await import('../../../infrastructure/rabbitmq/client.js');
+        const convertService = new ConvertService(prisma, cacheRepo, getRabbitMQClient());
+
+        const result = await convertService.execute(userId, parseResult.data);
+        return reply.status(202).send({ job_id: result.id });
+      } catch (err: any) {
+        if (err instanceof GifOwnerMismatchError) {
+          return reply.status(403).send({
+            error_code: 'GIF_FORBIDDEN',
+            message: 'Gif Owner mismatch',
+            status: 403,
+          });
+        }
+        if (err instanceof QuotaExceededError) {
+          return reply.status(403).send({
+            error_code: 'QUOTA_EXCEEDED',
+            message: err.message,
+            status: 403,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
   });
 };

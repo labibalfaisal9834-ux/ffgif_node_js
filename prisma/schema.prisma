@@ -19,11 +19,14 @@ model User {
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz()
 
-  verifier   Verifier?
-  reseter    Reseter?
-  profile    Profile?
-  quota      Quota?
-  lastUpload LastUpload?
+  verifier       Verifier?
+  reseter        Reseter?
+  profile        Profile?
+  quota          Quota?
+  lastUpload     LastUpload?
+  gifs           Gif[]
+  ownedShares    Share[]     @relation("ShareOwner")
+  receivedShares Share[]     @relation("ShareRecipient")
 
   @@map("users")
 }
@@ -97,4 +100,63 @@ model LastUpload {
 
   @@index([uploadedAt], map: "idx_last_upload_uploaded_at")
   @@map("last_upload")
+}
+
+model Gif {
+  name            String?  @default("")
+  key             String   @id
+  userId          String   @map("user_id") @db.Uuid
+  status          String   @default("private")
+  persist         Boolean  @default(false)
+  download        Int      @default(0)
+  fileSizeBytes   BigInt   @default(0) @map("file_size_bytes")
+  width           Int      @default(0)
+  height          Int      @default(0)
+  durationSeconds Decimal  @default(0.0) @map("duration_seconds") @db.Decimal(6, 2)
+  isPublic        Boolean  @default(false) @map("is_public")
+  url             String   @default("")
+  thumbnailKey    String?  @default("") @map("thumbnail_key")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shares      Share[]
+  shareTokens ShareToken[]
+
+  @@index([userId, status], map: "idx_gifs_user_id_status")
+  @@index([userId, createdAt(sort: Desc)], map: "idx_gifs_user_id_created_at")
+  @@map("gifs")
+}
+
+model Share {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  gifKey     String?   @map("gif_key")
+  ownerId    String?   @map("owner_id") @db.Uuid
+  sharedWith String?   @map("shared_with") @db.Uuid
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz()
+  createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz()
+
+  gif       Gif?  @relation(fields: [gifKey], references: [key], onDelete: Cascade)
+  owner     User? @relation("ShareOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  recipient User? @relation("ShareRecipient", fields: [sharedWith], references: [id], onDelete: Cascade)
+
+  @@unique([gifKey, sharedWith])
+  @@index([ownerId], map: "idx_shares_owner_id")
+  @@index([sharedWith], map: "idx_shares_shared_with")
+  @@index([expiresAt], map: "idx_shares_expires_at")
+  @@map("shares")
+}
+
+model ShareToken {
+  gifKey    String    @map("gif_key")
+  token     String    @id
+  email     String
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  gif Gif @relation(fields: [gifKey], references: [key], onDelete: Cascade)
+
+  @@unique([gifKey, email])
+  @@index([gifKey], map: "idx_share_tokens_gif_key")
+  @@map("share_tokens")
 }

@@ -69,6 +69,27 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       }
     });
 
+    // GET /gifs/me/recents (registered before /gifs/me/:key)
+    protectedScope.get('/gifs/me/recents', async (request, reply) => {
+      const userId = request.authUser.sub;
+      try {
+        const { GetRecentsService } = await import('../../../application/media/get_recents.service.js');
+        const { PostgresGifRepository } = await import('../../../infrastructure/postgres/gif_repository.js');
+        const gifRepo = new PostgresGifRepository(prisma);
+        const getRecentsService = new GetRecentsService(gifRepo);
+
+        const result = await getRecentsService.execute(userId);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
+
     // GET /gifs/me/:key
     protectedScope.get('/gifs/me/:key', async (request, reply) => {
       const { key } = request.params as { key: string };

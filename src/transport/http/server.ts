@@ -1,6 +1,8 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import fastifyJwt from '@fastify/jwt';
 import { Config, getConfig } from '../../config/env.js';
+import { authRoutes } from './routes/auth.routes.js';
 
 export function buildServer(configOverride?: Config): FastifyInstance {
   const cnf = configOverride || getConfig();
@@ -28,10 +30,22 @@ export function buildServer(configOverride?: Config): FastifyInstance {
     credentials: true,
   });
 
+  // JWT setup
+  app.register(fastifyJwt, {
+    secret: cnf.jwtSecret,
+    sign: {
+      expiresIn: '24h',
+      algorithm: 'HS256',
+    },
+  });
+
   // Health check endpoint
   app.get('/health', async (_request, reply) => {
     return reply.status(200).send({ status: 'ok' });
   });
+
+  // Register domain routes
+  app.register(authRoutes);
 
   return app;
 }

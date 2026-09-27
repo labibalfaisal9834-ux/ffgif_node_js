@@ -232,6 +232,76 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
   });
 
+  // GET /auth/reset
+  fastify.get('/auth/reset', async (request, reply) => {
+    const query = request.query as { token?: string };
+    if (!query.token) {
+      return reply.status(400).send({
+        error_code: 'BAD_REQUEST',
+        message: 'Bad request',
+        status: 400,
+      });
+    }
+
+    try {
+      const { ResetPasswordService } = await import('../../../application/auth/reset_password.service.js');
+      const resetService = new ResetPasswordService(prisma, rabbitmq, hasher);
+      const token = await resetService.getResetToken(query.token);
+      return reply.status(200).send({ token });
+    } catch (err: any) {
+      if (err instanceof ResetTokenFetchFailedError) {
+        return reply.status(410).send({
+          error_code: 'AUTH_RESET_TOKEN_INVALID',
+          message: 'expired or invalid token',
+          status: 410,
+        });
+      }
+      request.log.error(err);
+      return reply.status(500).send({
+        error_code: 'INTERNAL_ERROR',
+        message: 'internal server error',
+        status: 500,
+      });
+    }
+  });
+
+  // POST /auth/reset
+  fastify.post('/auth/reset', async (request, reply) => {
+    const parseResult = resetPasswordSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(422).send({
+        error_code: 'VALIDATION_FAILED',
+        message: 'field required',
+        status: 422,
+      });
+    }
+
+    try {
+      const { ResetPasswordService } = await import('../../../application/auth/reset_password.service.js');
+      const resetService = new ResetPasswordService(prisma, rabbitmq, hasher);
+      await resetService.resetPassword(
+        parseResult.data.token,
+        parseResult.data.password,
+        parseResult.data.confirm_password
+      );
+      return reply.status(200).send('ok');
+    } catch (err: any) {
+      if (err instanceof ResetTokenFetchFailedError) {
+        return reply.status(410).send({
+          error_code: 'AUTH_RESET_TOKEN_INVALID',
+          message: 'invalid or expired token',
+          status: 410,
+        });
+      }
+      request.log.error(err);
+      return reply.status(500).send({
+        error_code: 'INTERNAL_ERROR',
+        message: 'internal server error',
+        status: 500,
+      });
+    }
+  });
+
   // Protected auth routes (wrapped with authGuard plugin)
   fastify.register(async (protectedScope) => {
     protectedScope.register(authGuard);

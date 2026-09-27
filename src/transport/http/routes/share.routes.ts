@@ -97,6 +97,56 @@ export const shareRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       }
     });
 
+    // DELETE /gifs/me/:key/shares/:shareWithId
+    protectedScope.delete('/gifs/me/:key/shares/:shareWithId', async (request, reply) => {
+      const { key, shareWithId } = request.params as { key: string; shareWithId: string };
+      const userId = request.authUser.sub;
+
+      if (!key) {
+        return reply.status(400).send({
+          error_code: 'BAD_REQUEST',
+          message: 'gif key is missing',
+          status: 400,
+        });
+      }
+
+      if (!shareWithId) {
+        return reply.status(400).send({
+          error_code: 'BAD_REQUEST',
+          message: 'share id is missing',
+          status: 400,
+        });
+      }
+
+      try {
+        const { DeleteShareService } = await import('../../../application/share/delete.service.js');
+        const deleteShareService = new DeleteShareService(prisma);
+        await deleteShareService.execute(userId, key, shareWithId);
+        return reply.status(200).send({ msg: 'share deleted' });
+      } catch (err: any) {
+        if (err instanceof ShareForbiddenError) {
+          return reply.status(403).send({
+            error_code: 'SHARE_FORBIDDEN',
+            message: 'forbidden',
+            status: 403,
+          });
+        }
+        if (err instanceof ShareNotFoundError) {
+          return reply.status(404).send({
+            error_code: 'SHARE_NOT_FOUND',
+            message: 'not found',
+            status: 404,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
+
     // POST /s
     protectedScope.post('/s', async (request, reply) => {
       const userId = request.authUser.sub;

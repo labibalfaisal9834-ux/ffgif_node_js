@@ -158,6 +158,81 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       }
     });
 
+    // GET /gifs/me/:key/download
+    protectedScope.get('/gifs/me/:key/download', async (request, reply) => {
+      const { key } = request.params as { key: string };
+      const userId = request.authUser.sub;
+
+      try {
+        const { DownloadService } = await import('../../../application/media/download.service.js');
+        const downloadService = new DownloadService(prisma, storageRepo);
+        const url = await downloadService.execute(userId, key);
+        return reply.status(200).send({ url });
+      } catch (err: any) {
+        if (err instanceof GifNotFoundError) {
+          return reply.status(404).send({
+            error_code: 'GIF_NOT_FOUND',
+            message: 'gif not found',
+            status: 404,
+          });
+        }
+        if (err instanceof GifOwnerMismatchError) {
+          return reply.status(403).send({
+            error_code: 'GIF_FORBIDDEN',
+            message: 'Gif Owner mismatch',
+            status: 403,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
+
+    // GET /gifs/me/:key/thumbnail
+    protectedScope.get('/gifs/me/:key/thumbnail', async (request, reply) => {
+      const { key } = request.params as { key: string };
+      const userId = request.authUser.sub;
+
+      try {
+        const { ThumbnailService } = await import('../../../application/media/thumbnail.service.js');
+        const thumbnailService = new ThumbnailService(prisma, storageRepo);
+        const result = await thumbnailService.execute(userId, key);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        if (err instanceof GifNotFoundError) {
+          return reply.status(404).send({
+            error_code: 'GIF_NOT_FOUND',
+            message: 'gif not found',
+            status: 404,
+          });
+        }
+        if (err instanceof GifOwnerMismatchError) {
+          return reply.status(403).send({
+            error_code: 'GIF_FORBIDDEN',
+            message: 'Gif Owner mismatch',
+            status: 403,
+          });
+        }
+        if (err instanceof ThumbnailNotFoundError) {
+          return reply.status(404).send({
+            error_code: 'THUMBNAIL_NOT_FOUND',
+            message: 'thumbnail not found',
+            status: 404,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'failed to get gif thumbnail',
+          status: 500,
+        });
+      }
+    });
+
     // PATCH /gifs/me/:key
     protectedScope.patch('/gifs/me/:key', async (request, reply) => {
       const { key } = request.params as { key: string };

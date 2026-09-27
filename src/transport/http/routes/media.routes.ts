@@ -112,5 +112,34 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
         });
       }
     });
+
+    // GET /uploads/last
+    protectedScope.get('/uploads/last', async (request, reply) => {
+      const userId = request.authUser.sub;
+
+      try {
+        const { LastVideoService } = await import('../../../application/media/last_video.service.js');
+        const { PostgresLastVideoRepository } = await import('../../../infrastructure/postgres/last_upload_repository.js');
+        const lastVideoRepo = new PostgresLastVideoRepository(prisma);
+        const lastVideoService = new LastVideoService(lastVideoRepo);
+
+        const result = await lastVideoService.execute(userId);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        if (err instanceof LastVideoNotFoundError) {
+          return reply.status(404).send({
+            error_code: 'LAST_VIDEO_NOT_FOUND',
+            message: 'last video not found',
+            status: 404,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
   });
 };

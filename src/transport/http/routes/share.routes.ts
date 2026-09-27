@@ -164,4 +164,38 @@ export const shareRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       }
     });
   });
+
+  // Public routes
+  // GET /s/:token
+  fastify.get('/s/:token', async (request, reply) => {
+    const { token } = request.params as { token: string };
+    if (!token) {
+      return reply.status(400).send({
+        error_code: 'BAD_REQUEST',
+        message: 'token is missing',
+        status: 400,
+      });
+    }
+
+    try {
+      const { GetByTokenService } = await import('../../../application/share/get_by_token.service.js');
+      const getByTokenService = new GetByTokenService(prisma);
+      const result = await getByTokenService.execute(token);
+      return reply.status(200).send(result);
+    } catch (err: any) {
+      if (err instanceof ShareNotFoundError) {
+        return reply.status(404).send({
+          error_code: 'SHARE_NOT_FOUND',
+          message: 'share not found or expired',
+          status: 404,
+        });
+      }
+      request.log.error(err);
+      return reply.status(500).send({
+        error_code: 'INTERNAL_ERROR',
+        message: 'internal server error',
+        status: 500,
+      });
+    }
+  });
 };

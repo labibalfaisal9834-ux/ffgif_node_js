@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { UserRepository } from '../../domain/user/repository.js';
-import { User } from '../../domain/auth/entity.js';
+import type { UserRepository } from '../../domain/user/repository.js';
+import type { User } from '../../domain/auth/entity.js';
 import { PreconditionFailedError } from '../../domain/user/errors.js';
 
 export class PostgresUserRepository implements UserRepository {

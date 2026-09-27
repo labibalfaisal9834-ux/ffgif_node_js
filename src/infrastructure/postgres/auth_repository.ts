@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { AuthRepository } from '../../domain/auth/repository.js';
-import { User } from '../../domain/auth/entity.js';
+import type { AuthRepository } from '../../domain/auth/repository.js';
+import type { User } from '../../domain/auth/entity.js';
 
 export class PostgresAuthRepository implements AuthRepository {
   constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}

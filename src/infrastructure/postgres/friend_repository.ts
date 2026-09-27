@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { FriendResponse, Friendship, FriendshipStatus } from '../../domain/friend/entity.js';
-import { FriendRepository } from '../../domain/friend/repository.js';
+import type { FriendResponse, Friendship, FriendshipStatus } from '../../domain/friend/entity.js';
+import type { FriendRepository } from '../../domain/friend/repository.js';
 import {
   FriendshipForbiddenError,
   FriendshipNotFoundError,

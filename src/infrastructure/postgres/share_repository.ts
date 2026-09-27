@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { Share, ShareToken, GifTokenResponse, SharedGifResponse } from '../../domain/share/entity.js';
-import { ShareRepository } from '../../domain/share/repository.js';
+import type { Share, ShareToken, GifTokenResponse, SharedGifResponse } from '../../domain/share/entity.js';
+import type { ShareRepository } from '../../domain/share/repository.js';
 
 interface ShareWithGifRow {
   id: string;

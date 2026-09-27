@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { GifRepository, GifUpdateRequest } from '../../domain/media/repository.js';
-import { Gif, GifResponse } from '../../domain/media/entity.js';
+import type { GifRepository, GifUpdateRequest } from '../../domain/media/repository.js';
+import type { Gif, GifResponse } from '../../domain/media/entity.js';
 
 interface GifRow {
   key: string;

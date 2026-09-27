@@ -46,6 +46,39 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
   });
 
+  // GET /auth/verify
+  fastify.get('/auth/verify', async (request, reply) => {
+    const query = request.query as { token?: string };
+    if (!query.token) {
+      return reply.status(400).send({
+        error_code: 'BAD_REQUEST',
+        message: 'token is empty',
+        status: 400,
+      });
+    }
+
+    try {
+      const { VerifyService } = await import('../../../application/auth/verify.service.js');
+      const verifyService = new VerifyService(prisma);
+      await verifyService.execute(query.token);
+      return reply.status(200).send('account verified');
+    } catch (err: any) {
+      if (err instanceof InvalidTokenError) {
+        return reply.status(410).send({
+          error_code: 'AUTH_VERIFY_TOKEN_INVALID',
+          message: 'token expired or invalid',
+          status: 410,
+        });
+      }
+      request.log.error(err);
+      return reply.status(500).send({
+        error_code: 'INTERNAL_ERROR',
+        message: 'internal server error',
+        status: 500,
+      });
+    }
+  });
+
   // POST /auth/login
   fastify.post('/auth/login', async (request, reply) => {
     const parseResult = loginSchema.safeParse(request.body);

@@ -74,7 +74,11 @@ export class PostgresShareRepository implements ShareRepository {
   }
 
   async get(userId: string): Promise<SharedGifResponse[]> {
-    const records = await this.prisma.share.findMany({
+    type ShareWithGif = Prisma.ShareGetPayload<{
+      include: { gif: true };
+    }>;
+
+    const records = (await this.prisma.share.findMany({
       where: {
         OR: [
           { ownerId: userId },
@@ -88,9 +92,9 @@ export class PostgresShareRepository implements ShareRepository {
         gif: true,
       },
       orderBy: { createdAt: 'desc' },
-    });
+    })) as ShareWithGif[];
 
-    return records.map((r) => ({
+    return records.map((r: ShareWithGif) => ({
       id: r.id,
       gif_key: r.gifKey || '',
       owner_id: r.ownerId || '',

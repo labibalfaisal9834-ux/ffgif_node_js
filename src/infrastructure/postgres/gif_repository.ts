@@ -26,7 +26,7 @@ export class PostgresGifRepository implements GifRepository {
   }
 
   async get(userId: string, status?: string, limit = 20, offset = 0): Promise<GifResponse[]> {
-    const records = await this.prisma.gif.findMany({
+    const records = (await this.prisma.gif.findMany({
       where: {
         userId,
         status: status ? status : undefined,
@@ -34,9 +34,9 @@ export class PostgresGifRepository implements GifRepository {
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
-    });
+    })) as Prisma.GifGetPayload<{}>[];
 
-    return records.map((r) => ({
+    return records.map((r: Prisma.GifGetPayload<{}>) => ({
       key: r.key,
       name: r.name || '',
       status: r.status,
@@ -79,16 +79,16 @@ export class PostgresGifRepository implements GifRepository {
   }
 
   async getRecents(userId: string): Promise<GifResponse[]> {
-    const records = await this.prisma.gif.findMany({
+    const records = (await this.prisma.gif.findMany({
       where: {
         userId,
         OR: [{ status: 'recent' }, { persist: false }],
       },
       orderBy: { createdAt: 'desc' },
       take: 10,
-    });
+    })) as Prisma.GifGetPayload<{}>[];
 
-    return records.map((r) => ({
+    return records.map((r: Prisma.GifGetPayload<{}>) => ({
       key: r.key,
       name: r.name || '',
       status: r.status,

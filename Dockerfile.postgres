@@ -1,0 +1,11 @@
+FROM postgres:16-alpine AS builder
+RUN apk add --no-cache git build-base postgresql-dev clang llvm
+RUN git clone --branch v1.6.4 --depth 1 https://github.com/citusdata/pg_cron.git /pg_cron \
+    && cd /pg_cron \
+    && make with_llvm=no \
+    && make with_llvm=no install
+
+FROM postgres:16-alpine
+COPY --from=builder /usr/local/lib/postgresql/pg_cron.so /usr/local/lib/postgresql/
+COPY --from=builder /usr/local/share/postgresql/extension/pg_cron* /usr/local/share/postgresql/extension/
+RUN printf "CREATE ROLE ffgif WITH LOGIN SUPERUSER PASSWORD 'secret';\nCREATE DATABASE ffgif OWNER ffgif;\nGRANT ALL PRIVILEGES ON DATABASE ffgif TO ffgif;\n\\c ffgif\nALTER SCHEMA public OWNER TO ffgif;\nGRANT ALL ON SCHEMA public TO ffgif;\n" > /docker-entrypoint-initdb.d/00-init.sql

@@ -1,0 +1,167 @@
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+    container_name: ffgif-postgres
+    command: ["postgres", "-c", "shared_preload_libraries=pg_cron", "-c", "cron.database_name=${PG_NAME}"]
+    environment:
+      - POSTGRES_USER=${PG_SUPERUSER}
+      - POSTGRES_DB=${PG_SUPERDB}
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_SUPERUSER} -d ${PG_SUPERDB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ffgif-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ffgif-rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RMQ_PASS}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - backend
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: ffgif-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_NOTIFY_AMQP_ENABLE_1=on
+      - MINIO_NOTIFY_AMQP_URL_1=amqp://${RMQ_USER}:${RMQ_PASS}@rabbitmq:5672
+      - MINIO_NOTIFY_AMQP_EXCHANGE_1=${MINIO_NOTIFY_EXCHANGE}
+      - MINIO_NOTIFY_AMQP_EXCHANGE_TYPE_1=fanout
+      - MINIO_NOTIFY_AMQP_ROUTING_KEY_1=
+      - MINIO_NOTIFY_AMQP_DURABLE_1=on
+      - MINIO_NOTIFY_AMQP_AUTO_DELETED_1=off
+      - MINIO_NOTIFY_AMQP_DELIVERY_MODE_1=2
+      - MINIO_NOTIFY_AMQP_NO_WAIT_1=off
+      - MINIO_NOTIFY_AMQP_MANDATORY_1=off
+      - MINIO_NOTIFY_AMQP_INTERNAL_1=off
+      - MINIO_PERSIST_BUCKET=${MINIO_PERSIST_BUCKET}
+      - MINIO_TEMP_BUCKET=${MINIO_TEMP_BUCKET}
+      - MINIO_API_CORS_ALLOW_ORIGIN=${MINIO_API_CORS_ALLOW_ORIGIN}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: ffgif-api
+    ports:
+      - "8080:8080"
+    environment:
+      - ADDR=0.0.0.0
+      - PORT=${PORT}
+      - VERSION=${VERSION}
+      - SERVICE_NAME=${SERVICE_NAME}
+      - BCRYPT_COST=${BCRYPT_COST}
+      - HASH_PEPPER=${HASH_PEPPER}
+      - JWT_SECRET=${JWT_SECRET}
+      - PG_USER=${PG_USER}
+      - PG_PASSWORD=${PG_PASSWORD}
+      - PG_PORT=${PG_PORT}
+      - PG_ADDRESS=postgres
+      - PG_NAME=${PG_NAME}
+      - PG_SSLMODE=${PG_SSLMODE}
+      - PG_SUPERUSER=${PG_SUPERUSER}
+      - PG_SUPERDB=${PG_SUPERDB}
+      - REDIS_ADDR=redis:6379
+      - RMQ_ADDR=rabbitmq:5672
+      - RMQ_USER=${RMQ_USER}
+      - RMQ_PASS=${RMQ_PASS}
+      - MINIO_ADDR=minio:9000
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_TEMP_BUCKET=${MINIO_TEMP_BUCKET}
+      - MINIO_PERSIST_BUCKET=${MINIO_PERSIST_BUCKET}
+      - MINIO_NOTIFY_EXCHANGE=${MINIO_NOTIFY_EXCHANGE}
+      - MINIO_TEMP_BUCKET_TTL_DAYS=${MINIO_TEMP_BUCKET_TTL_DAYS}
+      - MINIO_API_CORS_ALLOW_ORIGIN=${MINIO_API_CORS_ALLOW_ORIGIN}
+      - MINIO_PUBLIC_ENDPOINT=127.0.0.1:9000
+      - EMAIL=${EMAIL}
+      - MAILTRAP_USERNAME=${MAILTRAP_USERNAME}
+      - MAILTRAP_PASSWORD=${MAILTRAP_PASSWORD}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - backend
+    volumes:
+      - apitmp:/tmp/ffgif
+    restart: unless-stopped
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitmqdata:
+  miniodata:
+  apitmp:

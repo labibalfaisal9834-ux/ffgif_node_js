@@ -78,6 +78,25 @@ export const shareRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       }
     });
 
+    // GET /gifs/me/shares
+    protectedScope.get('/gifs/me/shares', async (request, reply) => {
+      const userId = request.authUser.sub;
+
+      try {
+        const { GetSharesService } = await import('../../../application/share/get.service.js');
+        const getSharesService = new GetSharesService(prisma);
+        const result = await getSharesService.execute(userId);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
+
     // POST /s
     protectedScope.post('/s', async (request, reply) => {
       const userId = request.authUser.sub;

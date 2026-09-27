@@ -17,6 +17,58 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
   fastify.register(async (protectedScope) => {
     protectedScope.register(authGuard);
 
+    // GET /gifs/me
+    protectedScope.get('/gifs/me', async (request, reply) => {
+      const query = request.query as { filter?: string; status?: string; page?: string; limit?: string };
+      const userId = request.authUser.sub;
+      const page = query.page ? parseInt(query.page, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit, 10) : 20;
+      const filter = query.filter || query.status;
+
+      try {
+        const { GetGifsService } = await import('../../../application/media/get_gifs.service.js');
+        const { PostgresGifRepository } = await import('../../../infrastructure/postgres/gif_repository.js');
+        const gifRepo = new PostgresGifRepository(prisma);
+        const getGifsService = new GetGifsService(gifRepo);
+
+        const result = await getGifsService.execute(userId, filter, page, limit);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
+
+    // GET /gifs/user/:userId
+    protectedScope.get('/gifs/user/:userId', async (request, reply) => {
+      const { userId } = request.params as { userId: string };
+      const query = request.query as { filter?: string; status?: string; page?: string; limit?: string };
+      const page = query.page ? parseInt(query.page, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit, 10) : 20;
+      const filter = query.filter || query.status;
+
+      try {
+        const { GetGifsService } = await import('../../../application/media/get_gifs.service.js');
+        const { PostgresGifRepository } = await import('../../../infrastructure/postgres/gif_repository.js');
+        const gifRepo = new PostgresGifRepository(prisma);
+        const getGifsService = new GetGifsService(gifRepo);
+
+        const result = await getGifsService.execute(userId, filter, page, limit);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
+
     // POST /uploads
     protectedScope.post('/uploads', async (request, reply) => {
       const parseResult = uploadMediaSchema.safeParse(request.body);

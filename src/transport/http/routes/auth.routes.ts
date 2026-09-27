@@ -1,8 +1,10 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { signupSchema, loginSchema, resendVerifySchema, forgotPasswordSchema, resetPasswordSchema } from '../schemas/auth.schema.js';
 import { SignupService } from '../../../application/auth/signup.service.js';
+import { LoginService } from '../../../application/auth/login.service.js';
 import { UserExistsError, InvalidCredentialError, UserNotVerifiedError, UserNotFoundError, UserAlreadyVerifiedError, InvalidTokenError, ResetTokenFetchFailedError } from '../../../domain/auth/errors.js';
 import { prisma } from '../../../infrastructure/postgres/prisma.js';
+import { PostgresAuthRepository } from '../../../infrastructure/postgres/auth_repository.js';
 import { getRabbitMQClient } from '../../../infrastructure/rabbitmq/client.js';
 import { PasswordHasher } from '../../../application/auth/password_hasher.js';
 import { authGuard } from '../plugins/auth_guard.js';
@@ -33,6 +35,72 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           error_code: 'AUTH_USER_EXISTS',
           message: 'email exists',
           status: 409,
+        });
+      }
+      request.log.error(err);
+      return reply.status(500).send({
+        error_code: 'INTERNAL_ERROR',
+        message: 'internal server error',
+        status: 500,
+      });
+    }
+  });
+
+  // POST /auth/login
+  fastify.post('/auth/login', async (request, reply) => {
+    const parseResult = loginSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(422).send({
+        error_code: 'VALIDATION_FAILED',
+        message: 'Bad request',
+        status: 422,
+      });
+    }
+
+    try {
+      const authRepo = new PostgresAuthRepository(prisma);
+      const loginService = new LoginService(authRepo, hasher);
+      const { user } = await loginService.execute(parseResult.data);
+
+      const claims =
+        user.role === 'anon'
+          ? {
+              full_name: user.fullname,
+              role: user.role,
+              sub: user.id,
+              iss: 'ffgif',
+            }
+          : {
+              full_name: user.fullname,
+              email: user.email,
+              role: user.role,
+              sub: user.id,
+              iss: 'ffgif',
+            };
+
+      const token = fastify.jwt.sign(claims);
+
+      return reply.status(200).send({
+        token,
+        id: user.id,
+      });
+    } catch (err: any) {
+      if (err instanceof UserNotVerifiedError) {
+        return reply.status(403).send({
+          error_code: 'AUTH_USER_NOT_VERIFIED',
+          message: 'not verified',
+          status: 403,
+        });
+      }
+      if (err instanceof InvalidCredentialError) {
+        reply.header(
+          'WWW-Authenticate',
+          `Bearer realm="ffgif", error="invalid_token", error_description="invalid credentials"`
+        );
+        return reply.status(401).send({
+          error_code: 'AUTH_INVALID_CREDENTIALS',
+          message: 'invalid credentials',
+          status: 401,
         });
       }
       request.log.error(err);

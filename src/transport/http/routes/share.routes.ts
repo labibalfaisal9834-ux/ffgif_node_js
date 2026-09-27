@@ -77,5 +77,72 @@ export const shareRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
         });
       }
     });
+
+    // POST /s
+    protectedScope.post('/s', async (request, reply) => {
+      const userId = request.authUser.sub;
+      const { createShareByTokenSchema } = await import('../schemas/share.schema.js');
+      const parseResult = createShareByTokenSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(422).send({
+          error_code: 'VALIDATION_FAILED',
+          message: 'bad request',
+          status: 422,
+        });
+      }
+
+      const expiresAt = new Date(parseResult.data.expire_at);
+      if (isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+        return reply.status(422).send({
+          error_code: 'VALIDATION_FAILED',
+          message: 'expiry must be in the future',
+          status: 422,
+        });
+      }
+
+      try {
+        const { CreateByTokenService } = await import('../../../application/share/create_by_token.service.js');
+        const { getRabbitMQClient } = await import('../../../infrastructure/rabbitmq/client.js');
+        const createByTokenService = new CreateByTokenService(prisma, getRabbitMQClient());
+
+        const token = await createByTokenService.execute(
+          userId,
+          parseResult.data.gif_key,
+          parseResult.data.email,
+          expiresAt
+        );
+
+        reply.header('Location', `/s/${token}`);
+        return reply.status(201).send({ token });
+      } catch (err: any) {
+        if (err instanceof InvalidExpiryError) {
+          return reply.status(422).send({
+            error_code: 'VALIDATION_FAILED',
+            message: 'expiry must be in the future',
+            status: 422,
+          });
+        }
+        if (err instanceof GifNotFoundError) {
+          return reply.status(404).send({
+            error_code: 'GIF_NOT_FOUND',
+            message: 'gif not found',
+            status: 404,
+          });
+        }
+        if (err instanceof GifOwnerMismatchError) {
+          return reply.status(403).send({
+            error_code: 'GIF_FORBIDDEN',
+            message: 'forbidden',
+            status: 403,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
   });
 };

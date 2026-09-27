@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { GifTokenResponse } from '../../domain/share/entity.js';
+import type { GifTokenResponse } from '../../domain/share/entity.js';
 import { ShareNotFoundError } from '../../domain/share/errors.js';
 import { PostgresShareRepository } from '../../infrastructure/postgres/share_repository.js';
 import { getTokenHash } from '../auth/token_util.js';

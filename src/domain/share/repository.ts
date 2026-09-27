@@ -1,4 +1,4 @@
-import { Share, ShareByToken, GifTokenResponse, SharedGifResponse, ShareToken } from './entity.js';
+import type { Share, ShareByToken, GifTokenResponse, SharedGifResponse, ShareToken } from './entity.js';
 
 export interface ShareRepository {
   create(share: {

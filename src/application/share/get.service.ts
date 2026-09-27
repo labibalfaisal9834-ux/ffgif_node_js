@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { SharedGifResponse } from '../../domain/share/entity.js';
+import type { SharedGifResponse } from '../../domain/share/entity.js';
 import { PostgresShareRepository } from '../../infrastructure/postgres/share_repository.js';
 
 export class GetSharesService {

@@ -55,5 +55,35 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
         });
       }
     });
+
+    // GET /uploads/:key/status
+    protectedScope.get('/uploads/:key/status', async (request, reply) => {
+      const { key } = request.params as { key: string };
+      const userId = request.authUser.sub;
+
+      try {
+        const { StatusService } = await import('../../../application/media/status.service.js');
+        const { PostgresLastVideoRepository } = await import('../../../infrastructure/postgres/last_upload_repository.js');
+        const lastVideoRepo = new PostgresLastVideoRepository(prisma);
+        const statusService = new StatusService(cacheRepo, lastVideoRepo);
+
+        const result = await statusService.execute(userId, key);
+        return reply.status(200).send(result);
+      } catch (err: any) {
+        if (err instanceof GifOwnerMismatchError) {
+          return reply.status(403).send({
+            error_code: 'GIF_FORBIDDEN',
+            message: 'Gif Owner mismatch',
+            status: 403,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
   });
 };

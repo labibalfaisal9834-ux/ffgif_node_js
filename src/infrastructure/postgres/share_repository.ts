@@ -1,7 +1,8 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { Share, ShareToken } from '../../domain/share/entity.js';
+import { Share, ShareToken, GifTokenResponse, SharedGifResponse } from '../../domain/share/entity.js';
+import { ShareRepository } from '../../domain/share/repository.js';
 
-export class PostgresShareRepository {
+export class PostgresShareRepository implements ShareRepository {
   constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
 
   async create(share: {
@@ -38,7 +39,7 @@ export class PostgresShareRepository {
     };
   }
 
-  async createToken(shareToken: {
+  async createByToken(shareToken: {
     gifKey: string;
     token: string;
     email: string;
@@ -72,21 +73,54 @@ export class PostgresShareRepository {
     };
   }
 
-  async getByToken(tokenHash: string): Promise<ShareToken | null> {
+  async get(userId: string): Promise<SharedGifResponse[]> {
+    const records = await this.prisma.share.findMany({
+      where: {
+        OR: [
+          { ownerId: userId },
+          {
+            sharedWith: userId,
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
+        ],
+      },
+      include: {
+        gif: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return records.map((r) => ({
+      id: r.id,
+      gif_key: r.gifKey || '',
+      owner_id: r.ownerId || '',
+      shared_with: r.sharedWith || '',
+      expires_at: r.expiresAt,
+      name: r.gif?.name || '',
+      url: r.gif?.url || '',
+      thumbnail_url: r.gif?.thumbnailKey || '',
+    }));
+  }
+
+  async getByToken(tokenHash: string): Promise<GifTokenResponse | null> {
     const record = await this.prisma.shareToken.findFirst({
       where: {
         token: tokenHash,
         OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
       },
+      include: {
+        gif: true,
+      },
     });
     if (!record) return null;
 
     return {
-      gifKey: record.gifKey,
-      token: record.token,
-      email: record.email,
-      expiresAt: record.expiresAt,
-      createdAt: record.createdAt,
+      gif_key: record.gifKey,
+      name: record.gif?.name || '',
+      url: record.gif?.url || '',
+      thumbnail_url: record.gif?.thumbnailKey || '',
+      expires_at: record.expiresAt,
+      created_at: record.createdAt,
     };
   }
 
@@ -102,32 +136,11 @@ export class PostgresShareRepository {
     return record?.ownerId || null;
   }
 
-  async getShares(userId: string, limit = 20, offset = 0): Promise<Share[]> {
-    const records = await this.prisma.share.findMany({
-      where: {
-        sharedWith: userId,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-      take: limit,
-      skip: offset,
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return records.map((r) => ({
-      id: r.id,
-      gifKey: r.gifKey || '',
-      ownerId: r.ownerId || '',
-      sharedWith: r.sharedWith || '',
-      expiresAt: r.expiresAt,
-      createdAt: r.createdAt || new Date(),
-    }));
-  }
-
-  async delete(ownerId: string, shareId: string): Promise<void> {
+  async delete(gifKey: string, sharedWithId: string): Promise<void> {
     await this.prisma.share.deleteMany({
       where: {
-        id: shareId,
-        ownerId,
+        gifKey,
+        sharedWith: sharedWithId,
       },
     });
   }

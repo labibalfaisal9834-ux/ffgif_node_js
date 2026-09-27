@@ -19,8 +19,11 @@ model User {
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz()
 
-  verifier Verifier?
-  reseter  Reseter?
+  verifier   Verifier?
+  reseter    Reseter?
+  profile    Profile?
+  quota      Quota?
+  lastUpload LastUpload?
 
   @@map("users")
 }
@@ -50,4 +53,48 @@ model Reseter {
 
   @@index([expireAt], map: "idx_reseter_expire_at")
   @@map("reseter")
+}
+
+model Profile {
+  id         Int      @id @default(autoincrement())
+  userId     String   @unique @map("user_id") @db.Uuid
+  profilePic String?  @default("") @map("profile_pic")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model Quota {
+  id         Int    @id @default(autoincrement())
+  userId     String @unique @map("user_id") @db.Uuid
+  usedBytes  BigInt @default(0) @map("used_bytes")
+  totalBytes BigInt @default(1073741824) @map("total_bytes")
+  gifCount   Int    @default(0) @map("gif_count")
+  gifLimit   Int    @default(100) @map("gif_limit")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("quota")
+}
+
+model LastUpload {
+  id           Int       @id @default(autoincrement())
+  userId       String    @unique @map("user_id") @db.Uuid
+  fileKey      String    @map("file_key")
+  fileName     String?   @map("file_name")
+  contentType  String    @map("content_type")
+  sizeBytes    BigInt?   @map("size_bytes")
+  durationSec  Decimal?  @map("duration_sec") @db.Decimal(10, 3)
+  thumbnailUrl String?   @map("thumbnail_url")
+  uploadedAt   DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz()
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz()
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([uploadedAt], map: "idx_last_upload_uploaded_at")
+  @@map("last_upload")
 }

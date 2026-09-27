@@ -175,6 +175,43 @@ export const mediaRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       }
     });
 
+    // DELETE /gifs/me/:key
+    protectedScope.delete('/gifs/me/:key', async (request, reply) => {
+      const { key } = request.params as { key: string };
+      const userId = request.authUser.sub;
+
+      try {
+        const { DeleteGifService } = await import('../../../application/media/delete_gif.service.js');
+        const deleteGifService = new DeleteGifService(prisma, storageRepo);
+        await deleteGifService.execute(userId, key);
+        return reply.status(200).send({
+          gif_key: key,
+          status: 'deleted',
+        });
+      } catch (err: any) {
+        if (err instanceof GifNotFoundError) {
+          return reply.status(404).send({
+            error_code: 'GIF_NOT_FOUND',
+            message: 'gif not found',
+            status: 404,
+          });
+        }
+        if (err instanceof GifOwnerMismatchError) {
+          return reply.status(403).send({
+            error_code: 'GIF_FORBIDDEN',
+            message: 'Gif Owner mismatch',
+            status: 403,
+          });
+        }
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
+
     // POST /uploads
     protectedScope.post('/uploads', async (request, reply) => {
       const parseResult = uploadMediaSchema.safeParse(request.body);

@@ -111,4 +111,30 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       });
     }
   });
+
+  // Protected auth routes (wrapped with authGuard plugin)
+  fastify.register(async (protectedScope) => {
+    protectedScope.register(authGuard);
+
+    protectedScope.post('/auth/logout', async (request, reply) => {
+      try {
+        const { RedisCacheRepository } = await import('../../../infrastructure/redis/cache.js');
+        const { getRedisClientSync } = await import('../../../infrastructure/redis/client.js');
+        const { LogoutService } = await import('../../../application/auth/logout.service.js');
+
+        const cacheRepo = new RedisCacheRepository(getRedisClientSync());
+        const logoutService = new LogoutService(cacheRepo);
+
+        await logoutService.execute(request.rawToken, request.authUser.exp);
+        return reply.status(200).send('logout');
+      } catch (err: any) {
+        request.log.error(err);
+        return reply.status(500).send({
+          error_code: 'INTERNAL_ERROR',
+          message: 'internal server error',
+          status: 500,
+        });
+      }
+    });
+  });
 };

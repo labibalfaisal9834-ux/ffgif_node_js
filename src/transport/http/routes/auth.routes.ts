@@ -79,6 +79,51 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
   });
 
+  // POST /auth/verify/resend
+  fastify.post('/auth/verify/resend', async (request, reply) => {
+    const parseResult = resendVerifySchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(422).send({
+        error_code: 'VALIDATION_FAILED',
+        message: 'field required',
+        status: 422,
+      });
+    }
+
+    try {
+      const { ResendVerifyService } = await import('../../../application/auth/resend_verify.service.js');
+      const { PostgresVerifierRepository } = await import('../../../infrastructure/postgres/verifier_repository.js');
+
+      const authRepo = new PostgresAuthRepository(prisma);
+      const verifierRepo = new PostgresVerifierRepository(prisma);
+      const resendVerifyService = new ResendVerifyService(authRepo, verifierRepo, rabbitmq);
+
+      await resendVerifyService.execute(parseResult.data.email);
+      return reply.status(202).send({ msg: 'check mail' });
+    } catch (err: any) {
+      if (err instanceof UserNotFoundError) {
+        return reply.status(404).send({
+          error_code: 'AUTH_USER_NOT_FOUND',
+          message: 'user not found',
+          status: 404,
+        });
+      }
+      if (err instanceof UserAlreadyVerifiedError) {
+        return reply.status(403).send({
+          error_code: 'AUTH_USER_NOT_VERIFIED',
+          message: 'not verified',
+          status: 403,
+        });
+      }
+      request.log.error(err);
+      return reply.status(500).send({
+        error_code: 'INTERNAL_ERROR',
+        message: 'internal server error',
+        status: 500,
+      });
+    }
+  });
+
   // POST /auth/login
   fastify.post('/auth/login', async (request, reply) => {
     const parseResult = loginSchema.safeParse(request.body);

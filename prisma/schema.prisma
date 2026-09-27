@@ -1,0 +1,53 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username     String    @db.VarChar(21)
+  fullname     String?   @default("") @db.VarChar(100)
+  email        String    @unique @db.VarChar(50)
+  passwordHash String?   @default("") @map("password_hash") @db.VarChar(70)
+  isVerified   Boolean   @default(false) @map("is_verified")
+  role         String    @default("user") @db.VarChar(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz()
+
+  verifier Verifier?
+  reseter  Reseter?
+
+  @@map("users")
+}
+
+model Verifier {
+  id        Int      @id @default(autoincrement())
+  userId    String   @unique @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash") @db.VarChar(70)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  expireAt  DateTime @map("expire_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expireAt], map: "idx_verifier_expire_at")
+  @@map("verifier")
+}
+
+model Reseter {
+  id        Int      @id @default(autoincrement())
+  userId    String   @unique @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash") @db.VarChar(70)
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  expireAt  DateTime @map("expire_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expireAt], map: "idx_reseter_expire_at")
+  @@map("reseter")
+}

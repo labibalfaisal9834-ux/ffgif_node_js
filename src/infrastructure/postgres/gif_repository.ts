@@ -2,11 +2,28 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { GifRepository, GifUpdateRequest } from '../../domain/media/repository.js';
 import { Gif, GifResponse } from '../../domain/media/entity.js';
 
+interface GifRow {
+  key: string;
+  name?: string | null;
+  status: string;
+  persist: boolean;
+  url: string;
+  thumbnailKey?: string | null;
+  download: number;
+  fileSizeBytes: bigint | number;
+  width: number;
+  height: number;
+  durationSeconds: any;
+  isPublic: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export class PostgresGifRepository implements GifRepository {
   constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
 
   async create(gif: Omit<Gif, 'createdAt' | 'updatedAt'>): Promise<void> {
-    await this.prisma.gif.create({
+    await (this.prisma as any).gif.create({
       data: {
         key: gif.key,
         name: gif.name || '',
@@ -26,7 +43,7 @@ export class PostgresGifRepository implements GifRepository {
   }
 
   async get(userId: string, status?: string, limit = 20, offset = 0): Promise<GifResponse[]> {
-    const records = (await this.prisma.gif.findMany({
+    const records = await (this.prisma as any).gif.findMany({
       where: {
         userId,
         status: status ? status : undefined,
@@ -34,9 +51,9 @@ export class PostgresGifRepository implements GifRepository {
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
-    })) as Prisma.GifGetPayload<{}>[];
+    });
 
-    return records.map((r: Prisma.GifGetPayload<{}>) => ({
+    return records.map((r: GifRow) => ({
       key: r.key,
       name: r.name || '',
       status: r.status,
@@ -55,7 +72,7 @@ export class PostgresGifRepository implements GifRepository {
   }
 
   async getByKey(key: string, _forUpdate = false): Promise<GifResponse | null> {
-    const r = await this.prisma.gif.findUnique({
+    const r = await (this.prisma as any).gif.findUnique({
       where: { key },
     });
     if (!r) return null;
@@ -79,16 +96,16 @@ export class PostgresGifRepository implements GifRepository {
   }
 
   async getRecents(userId: string): Promise<GifResponse[]> {
-    const records = (await this.prisma.gif.findMany({
+    const records = await (this.prisma as any).gif.findMany({
       where: {
         userId,
         OR: [{ status: 'recent' }, { persist: false }],
       },
       orderBy: { createdAt: 'desc' },
       take: 10,
-    })) as Prisma.GifGetPayload<{}>[];
+    });
 
-    return records.map((r: Prisma.GifGetPayload<{}>) => ({
+    return records.map((r: GifRow) => ({
       key: r.key,
       name: r.name || '',
       status: r.status,
@@ -107,13 +124,13 @@ export class PostgresGifRepository implements GifRepository {
   }
 
   async delete(key: string): Promise<void> {
-    await this.prisma.gif.delete({
+    await (this.prisma as any).gif.delete({
       where: { key },
     });
   }
 
   async update(key: string, req: GifUpdateRequest): Promise<GifResponse> {
-    const r = await this.prisma.gif.update({
+    const r = await (this.prisma as any).gif.update({
       where: { key },
       data: {
         name: req.name !== undefined ? req.name : undefined,
@@ -143,7 +160,7 @@ export class PostgresGifRepository implements GifRepository {
   }
 
   async saveRecent(key: string): Promise<void> {
-    await this.prisma.gif.update({
+    await (this.prisma as any).gif.update({
       where: { key },
       data: {
         persist: true,
@@ -154,7 +171,7 @@ export class PostgresGifRepository implements GifRepository {
   }
 
   async getOwner(key: string): Promise<string | null> {
-    const r = await this.prisma.gif.findUnique({
+    const r = await (this.prisma as any).gif.findUnique({
       where: { key },
       select: { userId: true },
     });
@@ -162,7 +179,7 @@ export class PostgresGifRepository implements GifRepository {
   }
 
   async incrementDownload(key: string): Promise<void> {
-    await this.prisma.gif.update({
+    await (this.prisma as any).gif.update({
       where: { key },
       data: {
         download: { increment: 1 },

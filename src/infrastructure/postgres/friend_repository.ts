@@ -6,11 +6,32 @@ import {
   FriendshipNotFoundError,
 } from '../../domain/friend/errors.js';
 
+interface FriendUserRow {
+  id: string;
+  username: string;
+  fullname?: string | null;
+}
+
+interface FriendshipWithUsersRow {
+  requesterId: string;
+  addresseeId: string;
+  status: string;
+  createdAt: Date;
+  requester: FriendUserRow;
+  addressee: FriendUserRow;
+}
+
+interface FriendshipWithRequesterRow {
+  status: string;
+  createdAt: Date;
+  requester: FriendUserRow;
+}
+
 export class PostgresFriendRepository implements FriendRepository {
   constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
 
   async create(requesterId: string, addresseeId: string): Promise<Friendship> {
-    const record = await this.prisma.friendship.create({
+    const record = await (this.prisma as any).friendship.create({
       data: {
         requesterId,
         addresseeId,
@@ -29,7 +50,7 @@ export class PostgresFriendRepository implements FriendRepository {
   }
 
   async exists(userA: string, userB: string): Promise<boolean> {
-    const count = await this.prisma.friendship.count({
+    const count = await (this.prisma as any).friendship.count({
       where: {
         OR: [
           { requesterId: userA, addresseeId: userB },
@@ -41,7 +62,7 @@ export class PostgresFriendRepository implements FriendRepository {
   }
 
   async getById(id: string): Promise<Friendship | null> {
-    const record = await this.prisma.friendship.findUnique({
+    const record = await (this.prisma as any).friendship.findUnique({
       where: { id },
     });
     if (!record) return null;
@@ -57,7 +78,7 @@ export class PostgresFriendRepository implements FriendRepository {
   }
 
   async updateStatus(id: string, status: string, actingUserId: string): Promise<Friendship> {
-    const existing = await this.prisma.friendship.findUnique({
+    const existing = await (this.prisma as any).friendship.findUnique({
       where: { id },
     });
     if (!existing) {
@@ -67,7 +88,7 @@ export class PostgresFriendRepository implements FriendRepository {
       throw new FriendshipForbiddenError();
     }
 
-    const record = await this.prisma.friendship.update({
+    const record = await (this.prisma as any).friendship.update({
       where: { id },
       data: {
         status,
@@ -86,7 +107,7 @@ export class PostgresFriendRepository implements FriendRepository {
   }
 
   async delete(id: string, actingUserId: string): Promise<void> {
-    const existing = await this.prisma.friendship.findUnique({
+    const existing = await (this.prisma as any).friendship.findUnique({
       where: { id },
     });
     if (!existing) {
@@ -96,17 +117,13 @@ export class PostgresFriendRepository implements FriendRepository {
       throw new FriendshipForbiddenError();
     }
 
-    await this.prisma.friendship.delete({
+    await (this.prisma as any).friendship.delete({
       where: { id },
     });
   }
 
   async listFriends(userId: string): Promise<FriendResponse[]> {
-    type FriendshipWithUsers = Prisma.FriendshipGetPayload<{
-      include: { requester: true; addressee: true };
-    }>;
-
-    const records = (await this.prisma.friendship.findMany({
+    const records = await (this.prisma as any).friendship.findMany({
       where: {
         OR: [{ requesterId: userId }, { addresseeId: userId }],
         status: 'accepted',
@@ -115,9 +132,9 @@ export class PostgresFriendRepository implements FriendRepository {
         requester: true,
         addressee: true,
       },
-    })) as FriendshipWithUsers[];
+    });
 
-    return records.map((f: FriendshipWithUsers) => {
+    return records.map((f: FriendshipWithUsersRow) => {
       const friendUser = f.requesterId === userId ? f.addressee : f.requester;
       return {
         user_id: friendUser.id,
@@ -130,11 +147,7 @@ export class PostgresFriendRepository implements FriendRepository {
   }
 
   async listPendingIncoming(userId: string): Promise<FriendResponse[]> {
-    type FriendshipWithRequester = Prisma.FriendshipGetPayload<{
-      include: { requester: true };
-    }>;
-
-    const records = (await this.prisma.friendship.findMany({
+    const records = await (this.prisma as any).friendship.findMany({
       where: {
         addresseeId: userId,
         status: 'pending',
@@ -142,9 +155,9 @@ export class PostgresFriendRepository implements FriendRepository {
       include: {
         requester: true,
       },
-    })) as FriendshipWithRequester[];
+    });
 
-    return records.map((f: FriendshipWithRequester) => ({
+    return records.map((f: FriendshipWithRequesterRow) => ({
       user_id: f.requester.id,
       username: f.requester.username,
       fullname: f.requester.fullname || '',
@@ -153,4 +166,3 @@ export class PostgresFriendRepository implements FriendRepository {
     }));
   }
 }
-

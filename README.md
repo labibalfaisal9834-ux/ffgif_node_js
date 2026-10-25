@@ -1,4 +1,4 @@
-# FFGif (Node.js)
+# FFGifN
 
 > **Asynchronous Video-to-GIF Conversion & Sharing Platform built with Fastify, TypeScript, PostgreSQL, Prisma, MinIO, Redis, RabbitMQ, and FFmpeg.**
 
